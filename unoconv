@@ -933,7 +933,12 @@ class Convertor:
             phase = "import"
 
             ### Load inputfile
-            inputprops = UnoProps(Hidden=True, ReadOnly=True, UpdateDocMode=QUIET_UPDATE)
+            if outputfmt.filter == 'Text - txt - csv (StarCalc)':
+                # If we plan to export a CSV file don't set Hidden=True - Sheet activation does not work properly when Hidden is specified.
+                # Although the sheet does become the active sheet, it's not the sheet that gets saved if the spreadsheet is loaded with Hidden=True
+                inputprops = UnoProps(ReadOnly=True, UpdateDocMode=QUIET_UPDATE)
+            else:
+                inputprops = UnoProps(Hidden=True, ReadOnly=True, UpdateDocMode=QUIET_UPDATE)
 
             if op.password:
                 inputprops += UnoProps(Password=op.password)
@@ -1118,7 +1123,18 @@ class Convertor:
             info(1, "Output file: %s" % outputurl)
 
             try:
-                document.storeToURL(outputurl, tuple(outputprops) )
+                if outputfmt.filter == 'Text - txt - csv (StarCalc)':
+                        info(2, "CSV multi-sheet output")
+                        (outputfn, ext) = os.path.splitext(inputfn)
+                        oSheets = document.Sheets
+                        for i in range(oSheets.Count):
+                                sheet = oSheets.getByIndex(i)
+                                document.CurrentController.setActiveSheet(sheet)
+                                sheetoutputfn = outputfn + "-" + str(i) + os.extsep + outputfmt.extension
+                                outputurl = unohelper.absolutize( self.cwd, unohelper.systemPathToFileUrl(sheetoutputfn))
+                                document.storeToURL(outputurl, tuple(outputprops))
+                else:
+                        document.storeToURL(outputurl, tuple(outputprops) )
             except IOException as e:
                 raise UnoException("Unable to store document to %s (ErrCode %d)\n\nProperties: %s" % (outputurl, e.ErrCode, outputprops), None)
 
